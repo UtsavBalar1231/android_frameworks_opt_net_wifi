@@ -32,8 +32,10 @@ extern "C" int delete_module(const char *, unsigned int);
 #define WIFI_MODULE_PATH                "/vendor/lib/modules/"
 #define MLAN_DRIVER_MODULE_PATH          WIFI_MODULE_PATH"mlan.ko"
 #define BCM_STATIC_BUF_MODULE_PATH	 WIFI_MODULE_PATH"dhd_static_buf.ko"
+#define WFX_DRIVER_MODULE_PATH        WIFI_MODULE_PATH"wfx.ko"
 #define MVL_DRIVER_MODULE_NAME           "sd8xxx"
 #define BCM_DRIVER_MODULE_NAME           "bcmdhd"
+#define WFX_DRIVER_MODULE_NAME           "wfx"
 
 #ifndef WIFI_DRIVER_FW_PATH_STA
 #define WIFI_DRIVER_FW_PATH_STA NULL
@@ -75,6 +77,7 @@ enum {
     KERNEL_VERSION_4_4,
     KERNEL_VERSION_4_19,
     KERNEL_VERSION_5_10,
+    KERNEL_VERSION_6_1,
 };
 
 static char wifi_type[64] = {0};
@@ -109,6 +112,9 @@ int get_kernel_version(void)
     } else if (strstr(buf, "Linux version 5.10") != NULL) {
 	version = KERNEL_VERSION_5_10;
 	PLOG(ERROR) << "Kernel version is 5.10";
+	} else if (strstr(buf, "Linux version 6.1") != NULL) {
+		version = KERNEL_VERSION_6_1;
+		PLOG(ERROR) << "Kernel version is 6.1";
     } else {
         version = KERNEL_VERSION_UNKNOWN;
         PLOG(ERROR) << "Kernel version unknown.";
@@ -117,7 +123,9 @@ int get_kernel_version(void)
     return version;
 
 fderror:
-    return -1;
+	// HACK: Assume 4.19
+	version = KERNEL_VERSION_6_1;
+    return version;
 }
 
 /* 0 - not ready; 1 - ready. */
@@ -128,7 +136,8 @@ int check_wireless_ready(void)
 
 	if ((get_kernel_version() == KERNEL_VERSION_4_4)
 			|| (get_kernel_version() == KERNEL_VERSION_4_19)
-			|| (get_kernel_version() == KERNEL_VERSION_5_10)) {
+			|| (get_kernel_version() == KERNEL_VERSION_5_10)
+			|| (get_kernel_version() == KERNEL_VERSION_6_1)) {
 		fp = fopen("/proc/net/dev", "r");
 		if (fp == NULL) {
 			PLOG(ERROR) << "Couldn't open /proc/net/dev";
@@ -286,6 +295,10 @@ int wifi_load_driver() {
 
 	if (strstr(wifi_ko_path, BCM_DRIVER_MODULE_NAME)) {
 		insmod(BCM_STATIC_BUF_MODULE_PATH, "");
+	}
+
+	if (strstr(wifi_ko_path, WFX_DRIVER_MODULE_NAME)) {
+		insmod(WFX_DRIVER_MODULE_PATH, "");
 	}
 
   if (insmod(wifi_ko_path, wifi_ko_arg) < 0) {
